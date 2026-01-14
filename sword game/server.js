@@ -1,4 +1,4 @@
-// server.js - 13강 축하 메시지 추가
+// server.js - 채팅 기능 추가 및 닉네임 동기화 강화
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
@@ -7,6 +7,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// 포트 설정 (Render 배포 호환)
 const port = process.env.PORT || 3000;
 
 app.use(express.static('public'));
@@ -16,6 +17,7 @@ const users = {};
 io.on('connection', (socket) => {
     console.log('접속:', socket.id);
 
+    // 1. 입장
     socket.on('login', (nickname) => {
         const newUser = {
             id: socket.id,
@@ -27,7 +29,23 @@ io.on('connection', (socket) => {
 
         socket.emit('init_users', users);
         socket.broadcast.emit('user_joined', newUser);
+        
+        // 입장 메시지도 채팅창과 로그 양쪽에 띄움
         io.emit('news', `[시스템] '${nickname}'님이 입장하셨습니다.`);
+        io.emit('chat_message', { nickname: '시스템', msg: `${nickname}님이 입장하셨습니다.`, type: 'system' });
+    });
+
+    // 2. 채팅 메시지 처리 (새로 추가됨)
+    socket.on('send_chat', (msg) => {
+        const user = users[socket.id];
+        if (user && msg.trim().length > 0) {
+            // 모든 사람에게 메시지 전송
+            io.emit('chat_message', { 
+                nickname: user.nickname, 
+                msg: msg.substring(0, 50), // 50자 제한
+                type: 'user' 
+            });
+        }
     });
 
     socket.on('mine_gold', () => {
@@ -49,7 +67,9 @@ io.on('connection', (socket) => {
         user.level = 0;
         socket.emit('update_stats', user);
         io.emit('update_visual', { id: socket.id, level: 0, outcome: 'reset' });
-        io.emit('news', `'${user.nickname}'님이 검을 판매하여 ${reward}G를 벌었습니다!`);
+        
+        const msg = `'${user.nickname}'님이 검을 판매하여 ${reward}G를 벌었습니다!`;
+        io.emit('news', msg);
     });
 
     socket.on('request_enhance', () => {
@@ -77,9 +97,10 @@ io.on('connection', (socket) => {
             user.level++;
             outcome = 'success';
             
-            // ★ [수정됨] 13강 달성 시 특별 공지
             if (user.level === 13) {
-                io.emit('news', `🎉 [축] '${user.nickname}'님이 전설의 13강(Black) 검을 탄생시켰습니다!!! 🎉`);
+                const msg = `🎉 [축] '${user.nickname}'님이 전설의 13강(Black) 검을 탄생시켰습니다!!! 🎉`;
+                io.emit('news', msg);
+                io.emit('chat_message', { nickname: '시스템', msg: msg, type: 'system_bold' });
             } else {
                 io.emit('news', `'${user.nickname}'님 +${user.level}강 성공!`);
             }
@@ -106,5 +127,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(port, () => {
-    console.log(`RPG 서버 실행 중: http://localhost:${port}`);
+    console.log(`RPG 서버 실행 중: port ${port}`);
 });

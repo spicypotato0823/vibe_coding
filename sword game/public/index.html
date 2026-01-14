@@ -1,111 +1,187 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>검 강화 RPG Online - Black Sword</title>
+    <title>검 강화 RPG Online - Chat & UI</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; user-select: none; }
+        body { margin: 0; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; user-select: none; background-color: #111; }
         
-        .btn {
-            background: linear-gradient(to bottom, #444, #222);
-            border: 2px solid #888; color: white; padding: 10px 20px; border-radius: 10px;
-            cursor: pointer; font-weight: bold; text-shadow: 1px 1px 1px #000;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: transform 0.1s;
-        }
-        .btn:active { transform: scale(0.95); }
-        .btn-enhance {
-            background: linear-gradient(to bottom, #d32f2f, #b71c1c);
-            border: 2px solid #ffcdd2;
+        /* 배경 */
+        #bg-image {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; z-index: -1; opacity: 0.8;
         }
 
+        /* 버튼 공통 */
+        .btn {
+            background: linear-gradient(to bottom, #444, #222);
+            border: 2px solid #888; color: white; padding: 8px 16px; border-radius: 8px;
+            cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-enhance { background: linear-gradient(to bottom, #d32f2f, #b71c1c); border-color: #ffcdd2; }
+
+        /* 로그인 화면 */
         #login-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.9); z-index: 100;
             display: flex; flex-direction: column; justify-content: center; align-items: center; color: white;
         }
         #nickname-input { padding: 10px; font-size: 20px; text-align: center; margin-bottom: 20px; border-radius: 5px; }
-        
-        #ui-top-left { position: absolute; top: 20px; left: 20px; color: white; z-index: 10; pointer-events: none; }
-        h1 { margin: 0; font-size: 24px; text-shadow: 2px 2px 4px #000; color: #ffcc00; }
-        .stat-line { font-size: 18px; margin: 5px 0; text-shadow: 1px 1px 2px #000; }
-        #money-display { color: #ffd700; font-size: 22px; }
-        #ui-top-right { position: absolute; top: 20px; right: 20px; z-index: 10; }
-        #ui-bottom-left { position: absolute; bottom: 30px; left: 30px; z-index: 10; }
-        
-        #mine-btn {
-            width: 100px; height: 100px; border-radius: 50%;
-            background: radial-gradient(circle, #4caf50, #1b5e20); font-size: 16px;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            border: 3px solid #a5d6a7;
-        }
-        #ui-bottom-center {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10;
-        }
-        #enhance-btn {
-            width: 220px; height: 80px; font-size: 24px;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-        }
 
+        /* --- UI 레이아웃 개편 --- */
+
+        /* 1. 좌측 정보창 (닉네임, 돈, 로그 포함) */
+        #ui-left-panel {
+            position: absolute; top: 20px; left: 20px; width: 320px;
+            pointer-events: none; /* 클릭 통과 */
+            z-index: 10;
+        }
+        
+        #user-info-box {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #555;
+            margin-bottom: 15px;
+            color: white;
+        }
+        .info-text { font-size: 16px; margin: 5px 0; text-shadow: 1px 1px 2px black; }
+        #my-nick { font-size: 20px; font-weight: bold; color: #fff; margin-bottom: 10px; border-bottom: 1px solid #777; padding-bottom: 5px; display: block;}
+        
+        /* 로그 박스 (왼쪽으로 이동됨) */
         #log-box {
-            position: absolute; bottom: 130px; right: 20px; width: 300px;
-            display: flex; flex-direction: column; gap: 5px; align-items: flex-end;
-            pointer-events: none; z-index: 10;
+            width: 100%;
+            height: 200px; /* 높이 고정 */
+            display: flex; 
+            flex-direction: column-reverse; /* 최신이 아래에 */
+            gap: 5px; 
+            overflow: hidden;
         }
         .log-message {
             font-size: 13px; color: white; background-color: rgba(0,0,0,0.6);
-            padding: 8px 12px; border-radius: 8px; animation: slideIn 0.3s ease-out;
+            padding: 5px 10px; border-radius: 5px;
+            animation: fadeIn 0.3s;
         }
-        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* 2. 우측 상단 (판매 버튼) */
+        #ui-top-right { position: absolute; top: 20px; right: 20px; z-index: 10; }
+
+        /* 3. 우측 하단 (채팅창) */
+        #ui-chat-container {
+            position: absolute; bottom: 20px; right: 20px; width: 300px; height: 400px;
+            display: flex; flex-direction: column;
+            z-index: 10;
+        }
+        #chat-messages {
+            flex-grow: 1;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 10px 10px 0 0;
+            padding: 10px;
+            overflow-y: auto;
+            color: white;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        #chat-input-area {
+            display: flex; gap: 5px;
+        }
+        #chat-input {
+            flex-grow: 1; padding: 10px; border-radius: 5px; border: none; background: rgba(255,255,255,0.9);
+        }
+        #chat-btn { padding: 0 15px; }
+
+        /* 채팅 메시지 스타일 */
+        .chat-msg { margin-bottom: 4px; word-wrap: break-word; }
+        .chat-nick { font-weight: bold; color: #ffd700; margin-right: 5px; }
+        .chat-system { color: #aaa; font-style: italic; }
+
+        /* 4. 중앙 하단 (강화 버튼) */
+        #ui-bottom-center { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10; }
+        #enhance-btn { width: 220px; height: 80px; font-size: 24px; }
+
+        /* 5. 좌측 하단 (광질) - 로그 밑으로 배치 */
+        #ui-bottom-left { 
+            position: absolute; bottom: 30px; left: 30px; z-index: 10;
+        }
+        #mine-btn {
+            width: 90px; height: 90px; border-radius: 50%;
+            background: radial-gradient(circle, #4caf50, #1b5e20);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            border: 3px solid #a5d6a7; font-size: 14px; color: white;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* 스크롤바 꾸미기 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
-    <img id="bg-image" src="/bg.png" alt="background" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1;">
+    <img id="bg-image" src="/bg.jpg" onerror="this.style.display='none'">
 
     <div id="login-screen">
         <h1>⚔️ 대장장이 키우기 RPG</h1>
-        <p style="color:#aaa; margin-bottom: 20px;">13강에 도전하여 '블랙 소드'를 만드세요!</p>
-        <input type="text" id="nickname-input" placeholder="닉네임 (최대 8자)" maxlength="8">
+        <p style="color:#aaa; margin-bottom: 20px;">서버 연결 확인 중...</p>
+        <input type="text" id="nickname-input" placeholder="닉네임 (최대 8자)" maxlength="8" onkeydown="if(event.key==='Enter') startGame()">
         <button id="start-btn" class="btn" onclick="startGame()">입장하기</button>
     </div>
 
-    <div id="ui-top-left">
-        <h1>내 정보</h1>
-        <div class="stat-line" id="my-nick">닉네임: -</div>
-        <div class="stat-line" id="my-level" style="color:#aaa">강화: +0강</div>
-        <div class="stat-line" id="money-display">💰 0 G</div>
-        <div class="stat-line" id="cost-display" style="color:#ff8888; font-size:14px;">(강화비용: 10 G)</div>
+    <div id="ui-left-panel">
+        <div id="user-info-box">
+            <span id="my-nick">닉네임 로딩중...</span>
+            <div class="info-text" id="my-level" style="color:#aaa">강화: +0강</div>
+            <div class="info-text" id="money-display">💰 0 G</div>
+            <div class="info-text" id="cost-display" style="color:#ff8888; font-size:14px;">(강화비용: 10 G)</div>
+        </div>
+        <div id="log-box"></div>
     </div>
+
     <div id="ui-top-right">
-        <button id="sell-btn" class="btn" onclick="sellWeapon()">⚖️ 무기 판매</button>
+        <button class="btn" onclick="sellWeapon()">⚖️ 판매</button>
     </div>
-    <div id="ui-bottom-left">
-        <button id="mine-btn" class="btn" onclick="mineGold()">⛏️ 광질하기<br><span style="font-size:12px;">(+10 G)</span></button>
+
+    <div id="ui-chat-container">
+        <div id="chat-messages">
+            <div class="chat-system">채팅방에 입장했습니다.</div>
+        </div>
+        <div id="chat-input-area">
+            <input type="text" id="chat-input" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter') sendChat()">
+            <button id="chat-btn" class="btn" onclick="sendChat()">전송</button>
+        </div>
     </div>
+
     <div id="ui-bottom-center">
         <button id="enhance-btn" class="btn btn-enhance" onclick="requestEnhance()">🔥 강화하기</button>
     </div>
-    <div id="log-box"></div>
+
+    <div id="ui-bottom-left">
+        <button id="mine-btn" class="btn" onclick="mineGold()">⛏️ 광질<br>(+10 G)</button>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
-        const socket = io();
+        let socket;
+        try {
+            socket = io();
+        } catch(e) { alert("서버 연결 실패"); }
+
         let myId = null;
-        let isGameStarted = false;
-        
+        let myNickname = "";
         const otherSwords = {};
         let mySwordGroup = null;
         let mySwordMesh = null;
         const otherUserPositions = []; 
         for(let i=0; i<20; i++) otherUserPositions.push({ idx: i, occupied: false });
 
+        // Three.js Setup
         const scene = new THREE.Scene();
-        // 배경은 CSS img 태그로 처리했으므로 Three.js 배경은 투명하게
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
-        
-        // 렌더러 스타일 조정
         renderer.domElement.style.position = 'absolute';
         renderer.domElement.style.top = '0';
         renderer.domElement.style.zIndex = '0';
@@ -119,19 +195,18 @@
         light.position.set(-5, 10, 7);
         light.castShadow = true;
         scene.add(light);
-        const ambientLight = new THREE.AmbientLight(0x404040); 
-        scene.add(ambientLight);
+        scene.add(new THREE.AmbientLight(0x404040));
         const backLight = new THREE.DirectionalLight(0x5555ff, 0.5);
         backLight.position.set(5, 5, -5);
         scene.add(backLight);
 
         function createSwordGeometry() {
             const shape = new THREE.Shape();
-            shape.moveTo(0, -1.5); shape.lineTo(0.2, -1.5); shape.lineTo(0.2, -0.5);
-            shape.lineTo(0.6, -0.5); shape.lineTo(0.6, 0); shape.lineTo(0.25, 0);
-            shape.lineTo(0.15, 3.5); shape.lineTo(0, 4); shape.lineTo(-0.15, 3.5);
-            shape.lineTo(-0.25, 0); shape.lineTo(-0.6, 0); shape.lineTo(-0.6, -0.5);
-            shape.lineTo(-0.2, -0.5); shape.lineTo(-0.2, -1.5);
+            shape.moveTo(0,-1.5); shape.lineTo(0.2,-1.5); shape.lineTo(0.2,-0.5);
+            shape.lineTo(0.6,-0.5); shape.lineTo(0.6,0); shape.lineTo(0.25,0);
+            shape.lineTo(0.15,3.5); shape.lineTo(0,4); shape.lineTo(-0.15,3.5);
+            shape.lineTo(-0.25,0); shape.lineTo(-0.6,0); shape.lineTo(-0.6,-0.5);
+            shape.lineTo(-0.2,-0.5); shape.lineTo(-0.2,-1.5);
             const extrudeSettings = { steps: 1, depth: 0.1, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 2 };
             const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
             geometry.center(); return geometry;
@@ -139,64 +214,79 @@
 
         mySwordGroup = new THREE.Group();
         const geometry = createSwordGeometry();
-        const material = new THREE.MeshPhongMaterial({ color: 0x8b4513, shininess: 100, specular: 0x444444 });
+        const material = new THREE.MeshPhongMaterial({ color: 0x8b4513, shininess: 100 });
         mySwordMesh = new THREE.Mesh(geometry, material);
-        mySwordMesh.castShadow = true;
-        mySwordMesh.receiveShadow = true;
         mySwordGroup.add(mySwordMesh);
         mySwordGroup.position.set(-5, 1.5, 0);
-        mySwordGroup.rotation.z = -0.1; 
+        mySwordGroup.rotation.z = -0.1;
         scene.add(mySwordGroup);
 
+        // --- 기능 로직 ---
         function startGame() {
-            const nickname = document.getElementById("nickname-input").value.trim();
+            const input = document.getElementById("nickname-input");
+            const nickname = input.value.trim();
             if(!nickname) return alert("닉네임을 입력하세요!");
+            
+            myNickname = nickname; // 닉네임 로컬 저장
+            
+            // UI 즉시 반영 (느낌표 방지)
+            document.getElementById("my-nick").innerText = `플레이어: ${nickname}`;
+            
             socket.emit('login', nickname);
             document.getElementById("login-screen").style.display = "none";
-            isGameStarted = true;
         }
+
         function mineGold() { socket.emit('mine_gold'); }
         function sellWeapon() { if(confirm("판매하시겠습니까?")) socket.emit('sell_weapon'); }
         function requestEnhance() { socket.emit('request_enhance'); }
 
-        // ★ [수정됨] 레벨별 색상 로직 (13강 검정색 추가)
-        function updateSwordVisual(mesh, level, isMine) {
-            const baseScale = isMine ? 0.8 : 0.25;
-            const growthRate = isMine ? 0.25 : 0.05; 
-            const scale = baseScale + (level * growthRate);
-            mesh.scale.set(scale, scale, scale);
-
-            let colorHex;
-            if (level === 0) colorHex = 0x8B4513; 
-            else if (level <= 3) colorHex = 0x00FF00;
-            else if (level <= 6) colorHex = 0x0077FF;
-            else if (level <= 9) colorHex = 0x9900FF;
-            else if (level <= 12) colorHex = 0xFFD700;
-            else colorHex = 0x111111; // ★ 13강 이상: 검정 (Black Steel)
-
-            mesh.material.color.setHex(colorHex);
-            
-            // ★ 이펙트 효과
-            if (level >= 13) {
-                // 13강 검정색: 은은한 흰색 광채
-                mesh.material.emissive.setHex(0x333333); 
-                mesh.material.specular.setHex(0xffffff); // 반사광 강화
-            } else if (level >= 10) {
-                // 10~12강 골드: 금색 광채
-                mesh.material.emissive.setHex(0x553300);
-            } else {
-                mesh.material.emissive.setHex(0x000000);
+        // 채팅 보내기
+        function sendChat() {
+            const input = document.getElementById("chat-input");
+            const msg = input.value.trim();
+            if(msg) {
+                socket.emit('send_chat', msg);
+                input.value = "";
             }
         }
 
+        // --- 소켓 이벤트 ---
+        
+        // 1. 유저 정보 초기화 (닉네임 동기화 포함)
         socket.on('init_users', (users) => {
             myId = socket.id;
             if(users[myId]) {
+                // 닉네임 서버 데이터로 확실하게 덮어쓰기
+                document.getElementById("my-nick").innerText = `플레이어: ${users[myId].nickname}`;
                 updateMyStats(users[myId]);
                 updateSwordVisual(mySwordMesh, users[myId].level, true);
             }
             for (const id in users) { if (id !== myId) createOtherSword(id, users[id]); }
         });
+
+        // 2. 채팅 수신
+        socket.on('chat_message', (data) => {
+            const chatBox = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = 'chat-msg';
+            
+            if(data.type === 'system') {
+                div.innerHTML = `<span class="chat-system">${data.msg}</span>`;
+            } else if (data.type === 'system_bold') {
+                div.innerHTML = `<span style="color:#ffd700; font-weight:bold;">${data.msg}</span>`;
+            } else {
+                div.innerHTML = `<span class="chat-nick">${data.nickname}:</span> <span style="color:white">${data.msg}</span>`;
+            }
+            
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight; // 자동 스크롤
+        });
+
+        // 3. 로그 수신 (왼쪽 박스)
+        socket.on('news', (msg) => addLog(msg));
+        socket.on('news_personal', (msg) => addLog(msg, "#ffa500"));
+
+        // ... 나머지 시각화 로직 ...
         socket.on('user_joined', (newUser) => createOtherSword(newUser.id, newUser));
         socket.on('user_left', (id) => {
             if (otherSwords[id]) {
@@ -209,20 +299,6 @@
             updateMyStats(data);
             updateSwordVisual(mySwordMesh, data.level, true);
         });
-        function updateMyStats(data) {
-            const levelText = document.getElementById("my-level");
-            levelText.innerText = `강화: +${data.level}강`;
-            if(data.level===0) levelText.style.color = "#aaa";
-            else if(data.level<=3) levelText.style.color = "#4caf50";
-            else if(data.level<=6) levelText.style.color = "#2196f3";
-            else if(data.level<=9) levelText.style.color = "#9c27b0";
-            else if(data.level<=12) levelText.style.color = "#ffeb3b";
-            else levelText.style.color = "#ffffff"; // 13강은 흰색 텍스트
-
-            document.getElementById("money-display").innerText = `💰 ${data.money} G`;
-            const nextCost = (data.level + 1) * 10;
-            document.getElementById("cost-display").innerText = `(강화비용: ${nextCost} G)`;
-        }
         socket.on('update_visual', (data) => {
             let targetMesh = null;
             if (data.id === myId) targetMesh = mySwordMesh;
@@ -236,7 +312,7 @@
                 }
                 if (data.id===myId) {
                     if(data.outcome==='success') {
-                        if(data.level === 13) addLog("★ 전설의 13강 달성! ★", "#ffffff");
+                        if(data.level===13) addLog("★ 13강 달성! ★", "#fff");
                         else addLog("강화 성공!", "#4caf50");
                     }
                     else if(data.outcome==='maintain') addLog("강화 유지", "#ffeb3b");
@@ -244,28 +320,57 @@
                 }
             }
         });
-        socket.on('news_personal', (msg) => addLog(msg, "#ffa500"));
-        socket.on('news', (msg) => addLog(msg, "#ffffff"));
+
+        function updateMyStats(data) {
+            // 닉네임이 혹시 비어있으면 서버 데이터로 채우기
+            if(data.nickname) document.getElementById("my-nick").innerText = `플레이어: ${data.nickname}`;
+            
+            const levelText = document.getElementById("my-level");
+            levelText.innerText = `강화: +${data.level}강`;
+            // 색상 로직 생략(기존 동일)
+            if(data.level===0) levelText.style.color="#aaa";
+            else if(data.level<=3) levelText.style.color="#4caf50";
+            else if(data.level<=6) levelText.style.color="#2196f3";
+            else if(data.level<=9) levelText.style.color="#9c27b0";
+            else if(data.level<=12) levelText.style.color="#ffeb3b";
+            else levelText.style.color="#ffffff";
+
+            document.getElementById("money-display").innerText = `💰 ${data.money} G`;
+            document.getElementById("cost-display").innerText = `(비용: ${(data.level+1)*10} G)`;
+        }
+
+        function updateSwordVisual(mesh, level, isMine) {
+            const baseScale = isMine ? 0.8 : 0.25;
+            const growthRate = isMine ? 0.25 : 0.05; 
+            const scale = baseScale + (level * growthRate);
+            mesh.scale.set(scale, scale, scale);
+            let colorHex;
+            if (level === 0) colorHex = 0x8B4513; 
+            else if (level <= 3) colorHex = 0x00FF00;
+            else if (level <= 6) colorHex = 0x0077FF;
+            else if (level <= 9) colorHex = 0x9900FF;
+            else if (level <= 12) colorHex = 0xFFD700;
+            else colorHex = 0x111111;
+            mesh.material.color.setHex(colorHex);
+            if (level >= 13) mesh.material.emissive.setHex(0x333333); 
+            else if (level >= 10) mesh.material.emissive.setHex(0x553300);
+            else mesh.material.emissive.setHex(0x000000);
+        }
 
         function createOtherSword(id, info) {
             if(otherSwords[id]) return;
             const posInfo = otherUserPositions.find(p => !p.occupied);
             if(!posInfo) return;
             posInfo.occupied = true; posInfo.id = id;
-
             const group = new THREE.Group();
             const geometry = createSwordGeometry();
             const material = new THREE.MeshPhongMaterial({ color: 0x8b4513, shininess: 100 });
             const mesh = new THREE.Mesh(geometry, material);
-            mesh.castShadow = true;
             group.add(mesh);
             const sprite = makeTextSprite(info.nickname);
-            sprite.position.y = -2.5;
-            sprite.scale.set(1.5, 0.75, 1);
+            sprite.position.y = -2.5; sprite.scale.set(1.5, 0.75, 1);
             group.add(sprite);
-
-            const col = posInfo.idx % 4;
-            const row = Math.floor(posInfo.idx / 4);
+            const col = posInfo.idx % 4; const row = Math.floor(posInfo.idx / 4);
             group.position.set(1.5 + (col * 1.5), 3 - (row * 2.5), 0);
             scene.add(group);
             otherSwords[id] = group;
@@ -285,25 +390,19 @@
             sprite.scale.set(2, 1, 1); return sprite;
         }
 
-        // ★ [수정됨] 로그 함수: 축하 메시지 강조
         function addLog(msg, color="#fff") {
             const box = document.getElementById('log-box');
             const el = document.createElement('div');
-            el.className = 'log-message';
-            el.innerText = msg;
-            
-            // 13강 축하 메시지인 경우 디자인 변경
+            el.className = 'log-message'; el.innerText = msg;
             if(msg.includes("13강") || msg.includes("축")) {
-                el.style.borderLeft = `5px solid #ffffff`; // 흰색 테두리
-                el.style.background = "linear-gradient(90deg, rgba(0,0,0,0.8), rgba(50,50,50,0.8))";
-                el.style.fontWeight = "bold";
-                el.style.color = "#ffd700"; // 글씨는 금색
+                el.style.borderLeft = `5px solid #ffffff`; el.style.background = "rgba(50,50,50,0.9)"; el.style.color = "#ffd700";
             } else {
                 el.style.borderLeft = `3px solid ${color}`;
             }
-
+            // 최신 메시지가 위로 오게 (prepend) 하거나 아래로 (append + scroll).
+            // 여기선 CSS flex-direction: column-reverse 썼으므로 appendChild 하면 아래(시각적 위)에 붙음
             box.appendChild(el); 
-            if(box.children.length > 7) box.removeChild(box.firstChild);
+            if(box.children.length > 6) box.removeChild(box.firstChild);
         }
 
         function animate() {
