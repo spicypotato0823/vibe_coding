@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>검 강화 RPG Online - Black Sword</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; user-select: none; }
+        
+        .btn {
+            background: linear-gradient(to bottom, #444, #222);
+            border: 2px solid #888; color: white; padding: 10px 20px; border-radius: 10px;
+            cursor: pointer; font-weight: bold; text-shadow: 1px 1px 1px #000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: transform 0.1s;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-enhance {
+            background: linear-gradient(to bottom, #d32f2f, #b71c1c);
+            border: 2px solid #ffcdd2;
+        }
+
+        #login-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.9); z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; color: white;
+        }
+        #nickname-input { padding: 10px; font-size: 20px; text-align: center; margin-bottom: 20px; border-radius: 5px; }
+        
+        #ui-top-left { position: absolute; top: 20px; left: 20px; color: white; z-index: 10; pointer-events: none; }
+        h1 { margin: 0; font-size: 24px; text-shadow: 2px 2px 4px #000; color: #ffcc00; }
+        .stat-line { font-size: 18px; margin: 5px 0; text-shadow: 1px 1px 2px #000; }
+        #money-display { color: #ffd700; font-size: 22px; }
+        #ui-top-right { position: absolute; top: 20px; right: 20px; z-index: 10; }
+        #ui-bottom-left { position: absolute; bottom: 30px; left: 30px; z-index: 10; }
+        
+        #mine-btn {
+            width: 100px; height: 100px; border-radius: 50%;
+            background: radial-gradient(circle, #4caf50, #1b5e20); font-size: 16px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            border: 3px solid #a5d6a7;
+        }
+        #ui-bottom-center {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10;
+        }
+        #enhance-btn {
+            width: 220px; height: 80px; font-size: 24px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+
+        #log-box {
+            position: absolute; bottom: 130px; right: 20px; width: 300px;
+            display: flex; flex-direction: column; gap: 5px; align-items: flex-end;
+            pointer-events: none; z-index: 10;
+        }
+        .log-message {
+            font-size: 13px; color: white; background-color: rgba(0,0,0,0.6);
+            padding: 8px 12px; border-radius: 8px; animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+    </style>
+</head>
+<body>
+    <img id="bg-image" src="/bg.png" alt="background" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1;">
+
+    <div id="login-screen">
+        <h1>⚔️ 대장장이 키우기 RPG</h1>
+        <p style="color:#aaa; margin-bottom: 20px;">13강에 도전하여 '블랙 소드'를 만드세요!</p>
+        <input type="text" id="nickname-input" placeholder="닉네임 (최대 8자)" maxlength="8">
+        <button id="start-btn" class="btn" onclick="startGame()">입장하기</button>
+    </div>
+
+    <div id="ui-top-left">
+        <h1>내 정보</h1>
+        <div class="stat-line" id="my-nick">닉네임: -</div>
+        <div class="stat-line" id="my-level" style="color:#aaa">강화: +0강</div>
+        <div class="stat-line" id="money-display">💰 0 G</div>
+        <div class="stat-line" id="cost-display" style="color:#ff8888; font-size:14px;">(강화비용: 10 G)</div>
+    </div>
+    <div id="ui-top-right">
+        <button id="sell-btn" class="btn" onclick="sellWeapon()">⚖️ 무기 판매</button>
+    </div>
+    <div id="ui-bottom-left">
+        <button id="mine-btn" class="btn" onclick="mineGold()">⛏️ 광질하기<br><span style="font-size:12px;">(+10 G)</span></button>
+    </div>
+    <div id="ui-bottom-center">
+        <button id="enhance-btn" class="btn btn-enhance" onclick="requestEnhance()">🔥 강화하기</button>
+    </div>
+    <div id="log-box"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        const socket = io();
+        let myId = null;
+        let isGameStarted = false;
+        
+        const otherSwords = {};
+        let mySwordGroup = null;
+        let mySwordMesh = null;
+        const otherUserPositions = []; 
+        for(let i=0; i<20; i++) otherUserPositions.push({ idx: i, occupied: false });
+
+        const scene = new THREE.Scene();
+        // 배경은 CSS img 태그로 처리했으므로 Three.js 배경은 투명하게
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        
+        // 렌더러 스타일 조정
+        renderer.domElement.style.position = 'absolute';
+        renderer.domElement.style.top = '0';
+        renderer.domElement.style.zIndex = '0';
+        document.body.appendChild(renderer.domElement);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 2, 8);
+        camera.lookAt(0, 1, 0);
+
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(-5, 10, 7);
+        light.castShadow = true;
+        scene.add(light);
+        const ambientLight = new THREE.AmbientLight(0x404040); 
+        scene.add(ambientLight);
+        const backLight = new THREE.DirectionalLight(0x5555ff, 0.5);
+        backLight.position.set(5, 5, -5);
+        scene.add(backLight);
+
+        function createSwordGeometry() {
+            const shape = new THREE.Shape();
+            shape.moveTo(0, -1.5); shape.lineTo(0.2, -1.5); shape.lineTo(0.2, -0.5);
+            shape.lineTo(0.6, -0.5); shape.lineTo(0.6, 0); shape.lineTo(0.25, 0);
+            shape.lineTo(0.15, 3.5); shape.lineTo(0, 4); shape.lineTo(-0.15, 3.5);
+            shape.lineTo(-0.25, 0); shape.lineTo(-0.6, 0); shape.lineTo(-0.6, -0.5);
+            shape.lineTo(-0.2, -0.5); shape.lineTo(-0.2, -1.5);
+            const extrudeSettings = { steps: 1, depth: 0.1, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 2 };
+            const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+            geometry.center(); return geometry;
+        }
+
+        mySwordGroup = new THREE.Group();
+        const geometry = createSwordGeometry();
+        const material = new THREE.MeshPhongMaterial({ color: 0x8b4513, shininess: 100, specular: 0x444444 });
+        mySwordMesh = new THREE.Mesh(geometry, material);
+        mySwordMesh.castShadow = true;
+        mySwordMesh.receiveShadow = true;
+        mySwordGroup.add(mySwordMesh);
+        mySwordGroup.position.set(-5, 1.5, 0);
+        mySwordGroup.rotation.z = -0.1; 
+        scene.add(mySwordGroup);
+
+        function startGame() {
+            const nickname = document.getElementById("nickname-input").value.trim();
+            if(!nickname) return alert("닉네임을 입력하세요!");
+            socket.emit('login', nickname);
+            document.getElementById("login-screen").style.display = "none";
+            isGameStarted = true;
+        }
+        function mineGold() { socket.emit('mine_gold'); }
+        function sellWeapon() { if(confirm("판매하시겠습니까?")) socket.emit('sell_weapon'); }
+        function requestEnhance() { socket.emit('request_enhance'); }
+
+        // ★ [수정됨] 레벨별 색상 로직 (13강 검정색 추가)
+        function updateSwordVisual(mesh, level, isMine) {
+            const baseScale = isMine ? 0.8 : 0.25;
+            const growthRate = isMine ? 0.25 : 0.05; 
+            const scale = baseScale + (level * growthRate);
+            mesh.scale.set(scale, scale, scale);
+
+            let colorHex;
+            if (level === 0) colorHex = 0x8B4513; 
+            else if (level <= 3) colorHex = 0x00FF00;
+            else if (level <= 6) colorHex = 0x0077FF;
+            else if (level <= 9) colorHex = 0x9900FF;
+            else if (level <= 12) colorHex = 0xFFD700;
+            else colorHex = 0x111111; // ★ 13강 이상: 검정 (Black Steel)
+
+            mesh.material.color.setHex(colorHex);
+            
+            // ★ 이펙트 효과
+            if (level >= 13) {
+                // 13강 검정색: 은은한 흰색 광채
+                mesh.material.emissive.setHex(0x333333); 
+                mesh.material.specular.setHex(0xffffff); // 반사광 강화
+            } else if (level >= 10) {
+                // 10~12강 골드: 금색 광채
+                mesh.material.emissive.setHex(0x553300);
+            } else {
+                mesh.material.emissive.setHex(0x000000);
+            }
+        }
+
+        socket.on('init_users', (users) => {
+            myId = socket.id;
+            if(users[myId]) {
+                updateMyStats(users[myId]);
+                updateSwordVisual(mySwordMesh, users[myId].level, true);
+            }
+            for (const id in users) { if (id !== myId) createOtherSword(id, users[id]); }
+        });
+        socket.on('user_joined', (newUser) => createOtherSword(newUser.id, newUser));
+        socket.on('user_left', (id) => {
+            if (otherSwords[id]) {
+                const posInfo = otherUserPositions.find(p => p.id === id);
+                if(posInfo) { posInfo.occupied = false; delete posInfo.id; }
+                scene.remove(otherSwords[id]); delete otherSwords[id]; 
+            }
+        });
+        socket.on('update_stats', (data) => {
+            updateMyStats(data);
+            updateSwordVisual(mySwordMesh, data.level, true);
+        });
+        function updateMyStats(data) {
+            const levelText = document.getElementById("my-level");
+            levelText.innerText = `강화: +${data.level}강`;
+            if(data.level===0) levelText.style.color = "#aaa";
+            else if(data.level<=3) levelText.style.color = "#4caf50";
+            else if(data.level<=6) levelText.style.color = "#2196f3";
+            else if(data.level<=9) levelText.style.color = "#9c27b0";
+            else if(data.level<=12) levelText.style.color = "#ffeb3b";
+            else levelText.style.color = "#ffffff"; // 13강은 흰색 텍스트
+
+            document.getElementById("money-display").innerText = `💰 ${data.money} G`;
+            const nextCost = (data.level + 1) * 10;
+            document.getElementById("cost-display").innerText = `(강화비용: ${nextCost} G)`;
+        }
+        socket.on('update_visual', (data) => {
+            let targetMesh = null;
+            if (data.id === myId) targetMesh = mySwordMesh;
+            else if (otherSwords[data.id]) targetMesh = otherSwords[data.id].children[0];
+
+            if (targetMesh) {
+                updateSwordVisual(targetMesh, data.level, data.id === myId);
+                if (data.outcome === 'success') {
+                    targetMesh.userData.isRotating = true;
+                    targetMesh.userData.rotCount = 0;
+                }
+                if (data.id===myId) {
+                    if(data.outcome==='success') {
+                        if(data.level === 13) addLog("★ 전설의 13강 달성! ★", "#ffffff");
+                        else addLog("강화 성공!", "#4caf50");
+                    }
+                    else if(data.outcome==='maintain') addLog("강화 유지", "#ffeb3b");
+                    else addLog("강화 실패...", "#f44336");
+                }
+            }
+        });
+        socket.on('news_personal', (msg) => addLog(msg, "#ffa500"));
+        socket.on('news', (msg) => addLog(msg, "#ffffff"));
+
+        function createOtherSword(id, info) {
+            if(otherSwords[id]) return;
+            const posInfo = otherUserPositions.find(p => !p.occupied);
+            if(!posInfo) return;
+            posInfo.occupied = true; posInfo.id = id;
+
+            const group = new THREE.Group();
+            const geometry = createSwordGeometry();
+            const material = new THREE.MeshPhongMaterial({ color: 0x8b4513, shininess: 100 });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = true;
+            group.add(mesh);
+            const sprite = makeTextSprite(info.nickname);
+            sprite.position.y = -2.5;
+            sprite.scale.set(1.5, 0.75, 1);
+            group.add(sprite);
+
+            const col = posInfo.idx % 4;
+            const row = Math.floor(posInfo.idx / 4);
+            group.position.set(1.5 + (col * 1.5), 3 - (row * 2.5), 0);
+            scene.add(group);
+            otherSwords[id] = group;
+            updateSwordVisual(mesh, info.level, false);
+        }
+
+        function makeTextSprite(message) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 256; canvas.height = 128;
+            ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(0,0,256,128);
+            ctx.font = "Bold 40px Arial"; ctx.fillStyle = "white";
+            ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.fillText(message, 128, 64);
+            const texture = new THREE.CanvasTexture(canvas);
+            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture }));
+            sprite.scale.set(2, 1, 1); return sprite;
+        }
+
+        // ★ [수정됨] 로그 함수: 축하 메시지 강조
+        function addLog(msg, color="#fff") {
+            const box = document.getElementById('log-box');
+            const el = document.createElement('div');
+            el.className = 'log-message';
+            el.innerText = msg;
+            
+            // 13강 축하 메시지인 경우 디자인 변경
+            if(msg.includes("13강") || msg.includes("축")) {
+                el.style.borderLeft = `5px solid #ffffff`; // 흰색 테두리
+                el.style.background = "linear-gradient(90deg, rgba(0,0,0,0.8), rgba(50,50,50,0.8))";
+                el.style.fontWeight = "bold";
+                el.style.color = "#ffd700"; // 글씨는 금색
+            } else {
+                el.style.borderLeft = `3px solid ${color}`;
+            }
+
+            box.appendChild(el); 
+            if(box.children.length > 7) box.removeChild(box.firstChild);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if(mySwordGroup) {
+                mySwordGroup.rotation.y += 0.005;
+                if(mySwordMesh.userData.isRotating) {
+                    mySwordMesh.rotation.y += 0.2; mySwordMesh.userData.rotCount += 0.2;
+                    if(mySwordMesh.userData.rotCount > 6.28) { mySwordMesh.userData.isRotating = false; mySwordMesh.rotation.y = 0; }
+                }
+            }
+            for (const id in otherSwords) { 
+                const mesh = otherSwords[id].children[0];
+                if(mesh.userData.isRotating) {
+                    mesh.rotation.y += 0.2; mesh.userData.rotCount += 0.2;
+                    if(mesh.userData.rotCount > 6.28) { mesh.userData.isRotating = false; mesh.rotation.y = 0; }
+                }
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
